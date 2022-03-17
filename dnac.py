@@ -240,7 +240,7 @@ def generateTemplatePayload(device_list):
             if "bad_config" in device_list[device]:
                 # Add conditional to ensure config change only applies to device with matching management IP
                 template_payload.append(
-                    f"#if($__device.managementIpAddress == '{device}')"
+                    f"#if($device_ip == '{device}')"
                 )
                 # Iterate through bad config items, and add to list to negate
                 for config_item in device_list[device]["bad_config"]:
@@ -402,7 +402,10 @@ def run():
             # If any bad configuration is found, append it to target_devices dictionary
             target_devices[device]["bad_config"] = result
             # Also add device to list of devices to push template to
-            deployable_devices.append({"id": device, "type": "MANAGED_DEVICE_IP"})
+            deployable_devices.append({"id": device,
+                                       "type": "MANAGED_DEVICE_IP",
+                                       "params": {"device_ip": device}
+                                       })
 
     # Generate template file based on config that needs to be modified
     console.print()
