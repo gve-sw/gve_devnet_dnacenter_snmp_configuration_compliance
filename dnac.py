@@ -62,11 +62,11 @@ TEMPLATE_NAME = ""
 DEVICE_FILTER = {
     "hostname": None,
     "management_ip_address": None,
-    "location_name": None,
-    "family": ["Switches and Hubs", "Routers"],
+    "family": None,
     "series": None,
     "platform_id": None,
 }
+LOCATION_FILTER = []
 #################################################
 
 
@@ -232,16 +232,14 @@ def generateTemplatePayload(device_list):
     Returns:
     template_payload - Completed template file to be uploaded to DNAC
     """
-    # Create Jinja template payload
+    # Create Velocity template payload
     template_payload = []
     with console.status("Generating template payload..."):
         for device in device_list:
             # If there is no bad config to remove, skip this device
             if "bad_config" in device_list[device]:
                 # Add conditional to ensure config change only applies to device with matching management IP
-                template_payload.append(
-                    f"#if($device_ip == '{device}')"
-                )
+                template_payload.append(f"#if($device_ip == '{device}')")
                 # Iterate through bad config items, and add to list to negate
                 for config_item in device_list[device]["bad_config"]:
                     template_payload.append(f"no {config_item}")
@@ -354,10 +352,19 @@ def run():
     devices = dnac.devices.get_device_list(**DEVICE_FILTER)
 
     # Build dictionary mapping Device IP address to UUID
-    target_devices = {
-        device["managementIpAddress"]: {"id": device["id"]}
-        for device in devices.response
-    }
+    target_devices = {}
+    for device in devices.response:
+        # If filtering by location, we need to get location info from device_detail API
+        if len(LOCATION_FILTER) >= 1:
+            device_detail = dnac.devices.get_device_detail(
+                identifier="uuid", search_by=device["id"]
+            )
+            if device_detail.response["location"] not in LOCATION_FILTER:
+                # Skip if device is not in desired location
+                continue
+        # Add device to list
+        target_devices[device["managementIpAddress"]] = {"id": device["id"]}
+
     # Device product family / series will be required when creating a new template
     # So for each device we are targeting, we'll build that list of types here
     device_types = []
@@ -402,10 +409,13 @@ def run():
             # If any bad configuration is found, append it to target_devices dictionary
             target_devices[device]["bad_config"] = result
             # Also add device to list of devices to push template to
-            deployable_devices.append({"id": device,
-                                       "type": "MANAGED_DEVICE_IP",
-                                       "params": {"device_ip": device}
-                                       })
+            deployable_devices.append(
+                {
+                    "id": device,
+                    "type": "MANAGED_DEVICE_IP",
+                    "params": {"device_ip": device},
+                }
+            )
 
     # Generate template file based on config that needs to be modified
     console.print()

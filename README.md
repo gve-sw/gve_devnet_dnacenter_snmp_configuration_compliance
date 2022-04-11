@@ -59,11 +59,11 @@ TEMPLATE_NAME = ""
 # Modify the below parameters to filter to a subset of devices
 DEVICE_FILTER = {"hostname": None,
                  "management_ip_address": None,
-                 "location_name": None,
                  "family": ['Switches and Hubs', 'Routers'],
                  "series": None,
                  "platform_id": None
                  }
+LOCATION_FILTER = []
 #################################################
 ```
 
