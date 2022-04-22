@@ -182,6 +182,7 @@ def validate_snmp_config(device_ip):
         if file.endswith("RUNNINGCONFIG.cfg"):
             running_config = path + file
     with open(running_config, "r") as config:
+        config_found = False
         for line in config:
             if "snmp-server host" in line.strip():
                 if (
@@ -191,12 +192,18 @@ def validate_snmp_config(device_ip):
                     console.print(
                         f"[green][bold]Config valid[/bold][/green]: {escape(line.strip())}"
                     )
+                    config_found = True
                     pass
                 else:
                     console.print(
                         f"[yellow][bold]Config invalid[/bold][/yellow]: {escape(line.strip())}"
                     )
+                    config_found = True
                     bad_config.append(line.strip())
+        if not config_found:
+            console.print(
+                f"[yellow][bold]No matching config found for device.[/bold][/yellow]"
+            )
     console.print()
     return bad_config
 
@@ -399,23 +406,23 @@ def run():
             "Compare current configurations to expected configurations", title="Step 4"
         )
     )
-    # No need to deploy template to devices that are up-to-date
-    # So we will build a list of which devices need changes
+
+    # Build a list of which devices to deploy changes
     deployable_devices = []
     for device in target_devices:
         # Run validation against current config vs expected config
         result = validate_snmp_config(device)
+        # If any bad configuration is found, append it to target_devices dictionary
         if result:
-            # If any bad configuration is found, append it to target_devices dictionary
             target_devices[device]["bad_config"] = result
-            # Also add device to list of devices to push template to
-            deployable_devices.append(
-                {
-                    "id": device,
-                    "type": "MANAGED_DEVICE_IP",
-                    "params": {"device_ip": device},
-                }
-            )
+        # Also add device to list of devices to push template to
+        deployable_devices.append(
+            {
+                "id": device,
+                "type": "MANAGED_DEVICE_IP",
+                "params": {"device_ip": device},
+            }
+        )
 
     # Generate template file based on config that needs to be modified
     console.print()
