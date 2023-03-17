@@ -17,7 +17,7 @@ import os
 import secrets
 import string
 import sys
-from re import template
+import re
 from time import sleep
 
 import pyzipper
@@ -59,6 +59,7 @@ TEMPLATE_NAME = ""
 
 # By default, this script will pull ALL devices in DNAC.
 # Modify the below parameters to filter to a subset of devices
+# NOTE: Any unused fields must be set to None
 DEVICE_FILTER = {
     "hostname": None,
     "management_ip_address": None,
@@ -177,7 +178,9 @@ def validate_snmp_config(device_ip):
     """
     bad_config = []
     console.print(f"Reading config for device at {device_ip}")
-    path = f"./configfiles/{device_ip}/"
+    for file in os.listdir("./configfiles"):
+        if file.startswith(device_ip):
+            path = f"./configfiles/{file}/"
     for file in os.listdir(path):
         if file.endswith("RUNNINGCONFIG.cfg"):
             running_config = path + file
@@ -333,6 +336,12 @@ def deployTemplate(template_id, device_list):
         )
         # Grab deployment UUID
         deploy_id = str(deploy_template.deploymentId).split(":")[-1].strip()
+        # If any errors are generated, they are included in the deploymentId field
+        # So let's validate that we actually have a valid UUID - otherwise assume error
+        if not re.match("^.{8}-.{4}-.{4}-.{4}-.{12}$", deploy_id):
+            console.print("[red]Error deploying template: ")
+            console.print(deploy_template)
+            sys.exit(1)
         while True:
             # Monitor deployment status to see when it completes
             response = dnac.configuration_templates.get_template_deployment_status(
@@ -381,6 +390,10 @@ def run():
         )
 
     console.print(f"[bold]Found {len(target_devices)} devices that matched criteria")
+
+    if len(target_devices) == 0:
+        console.print("[red]No devices found. Quitting...")
+        sys.exit(0)
 
     console.print()
     console.print(Panel.fit("Export current device configurations", title="Step 3"))
